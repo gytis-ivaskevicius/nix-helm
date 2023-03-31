@@ -103,7 +103,7 @@ let
   mkKube = abort "TODO: Implement this";
 
   nixHelm = {
-    inherit mkKube mkHelm;
+    inherit mkKube mkHelm mkOutput;
   } // utils;
 in
 nixHelm
