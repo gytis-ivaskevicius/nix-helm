@@ -23,10 +23,19 @@ let
   mkHelm = { name, chart, namespace, context, kubeconfig, values, templates ? { } }:
     let
       output = mkOutput { inherit name values chart templates namespace kubeconfig context; };
+      mkAction = execName: {
+        inherit (output) drvPath type outPath outputName name; meta.mainProgram = execName;
+      };
+
+      self = {
+        inherit (output) drvPath type;
+        apply = mkAction "apply.sh";
+        destroy = mkAction "destroy.sh";
+        plan = mkAction "plan.sh";
+        status = mkAction "status.sh";
+      };
     in
-    {
-      inherit name output values;
-    };
+    self;
 
   mkOutput =
     { chart
