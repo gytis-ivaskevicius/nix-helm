@@ -10,6 +10,7 @@
       mkHelmish = system: nixpkgsFor.${system}.callPackage ./src { };
       examples = helmish: {
         sample = import ./examples/nginx { inherit helmish; };
+        ubuntu = import ./examples/ubuntu { inherit helmish; };
       };
     in
     {

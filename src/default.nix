@@ -7,6 +7,8 @@ let
     plugins = with pkgs.kubernetes-helmPlugins; [ helm-diff ];
   });
 
+  ifNotNullString = str: lib.optionalString (str != null);
+
   partitionAttrs = fn: values:
     lib.foldlAttrs
       (acc: name: value:
@@ -20,9 +22,9 @@ let
       { right = { }; wrong = { }; }
       values;
 
-  mkHelm = { name, chart, namespace, context, kubeconfig, values, templates ? { } }:
+  mkHelm = { name, chart, namespace, context, kubeconfig, values, templates ? { }, kustomization ? { } }:
     let
-      output = mkOutput { inherit name values chart templates namespace kubeconfig context; };
+      output = mkOutput { inherit name values chart templates namespace kubeconfig context kustomization; };
       mkAction = execName: {
         inherit (output) drvPath type outPath outputName name; meta.mainProgram = execName;
       };
@@ -37,6 +39,15 @@ let
     in
     self;
 
+  postRenderer = pkgs.writeShellScript "kustomize.sh" ''
+    set -euo pipefail
+    TMP=$(mktemp -d)
+    cat > $TMP/resources.yaml
+    cp kustomization.yaml $TMP/kustomization.yaml
+    kubectl kustomize $TMP
+    rm -r $TMP
+  '';
+
   mkOutput =
     { chart
     , name
@@ -45,6 +56,7 @@ let
     , namespace
     , kubeconfig
     , context
+    , kustomization ? { }
     }:
     let
 
@@ -57,10 +69,16 @@ let
       fileTemplates = templatesPartitions.right;
       attrTemplates = templatesPartitions.wrong;
 
+      kustomization' = kustomization // { resources = [ "resources.yaml" ]; };
+
       # Helm Boilerplate
       helmArgs = ''\
         --namespace "${namespace}" \
+      '' + lib.optionalString (kustomization != { }) ''
+        --post-renderer ${postRenderer} \
+      '' + ifNotNullString kubeconfig ''
         --kubeconfig "${kubeconfig}" \
+      '' + ifNotNullString context ''
         --kube-context "${context}" \
       '';
 
@@ -85,6 +103,7 @@ let
       # Helm Commands
       __commandApply = ''
         #! ${pkgs.bash}/bin/sh
+        cd ${placeholder "out"}
         ${placeholder "out"}/bin/plan.sh
         ${bashConfirmationDialog name "upgrade --install ${name} ${helmArgsWithValues}" "Apply canceled"}
       '';
@@ -96,6 +115,7 @@ let
 
       __commandPlan = ''
         #! ${pkgs.bash}/bin/sh
+        cd ${placeholder "out"}
         ${helm} diff upgrade ${name} --install  ${helmArgsWithValues}
       '';
 
@@ -124,7 +144,7 @@ let
       passAsFile = [ "__commandApply" "__commandDestroy" "__commandPlan" "__commandStatus" "values" ] ++ builtins.attrNames attrTemplates;
       attrTemplates = builtins.attrNames attrTemplates;
       fileTemplates = builtins.attrNames fileTemplates;
-    } // fileTemplates // attrTemplates // templatesNames);
+    } // fileTemplates // attrTemplates // templatesNames // (lib.optionalAttrs (kustomization != { }) { kustomization = builtins.toJSON kustomization'; }));
 
 
   nixHelm = {

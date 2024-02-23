@@ -12,6 +12,9 @@ if [[ ! -z "${valuesPath-}" ]]; then
 fi
 
 cat $chartPath | gojsontoyaml > $out/Chart.yaml
+if [[ ! -z "${kustomization-}" ]]; then
+  echo $kustomization | gojsontoyaml > $out/kustomization.yaml
+fi
 
 for file in $attrTemplates; do
     cat $(eval "echo \$${file}Path") | gojsontoyaml > $(eval "echo $out/templates/\$${file}Name")
