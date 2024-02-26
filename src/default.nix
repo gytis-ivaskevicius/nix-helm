@@ -21,8 +21,16 @@ let
     in
     self;
 
-  nixHelm = {
-    inherit mkHelm mkOutput;
-  };
+  mkHelmMultiTarget = { defaults ? _: { }, targets }:
+    let
+      chartConstructor = name: target:
+        let
+          args = (lib.recursiveUpdate (defaults args) (target args));
+        in
+        mkHelm args;
+    in
+    lib.mapAttrs chartConstructor targets;
 in
-nixHelm
+{
+  inherit mkHelmMultiTarget mkHelm mkOutput;
+}
