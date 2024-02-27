@@ -34,6 +34,13 @@ in
       type = types.path;
     };
 
+    helmArgs = mkOption {
+      description = "Arguments passed to helm";
+      example = [ "--debug" ];
+      default = [ ];
+      type = types.listOf types.str;
+    };
+
     templates = mkOption {
       description = "Attrset of Kubernetes resources";
       example = literalExpression ''
@@ -104,17 +111,40 @@ in
   config =
     let
       mkOutput = import ./mkOutput.nix { inherit pkgs lib; };
-      output = mkOutput { inherit (config) name values chart templates namespace kubeconfig context kustomization; };
+      output = mkOutput { inherit (config) name values chart templates helmArgs kustomization; };
       mkAction = execName: {
         inherit (output) drvPath type outPath outputName name;
         meta.mainProgram = execName;
       };
+
+      postRenderer = pkgs.writeShellScript "kustomize.sh" ''
+        set -euo pipefail
+        TMP=$(mktemp -d)
+        cat > $TMP/resources.yaml
+        cp kustomization.yaml $TMP/kustomization.yaml
+        kubectl kustomize $TMP
+        rm -r $TMP
+      '';
     in
     {
       _module.args = {
         inherit (config) utils values;
         chart = config;
       };
+
+      helmArgs = lib.optionals (config.namespace != null) [
+        "--namespace"
+        config.namespace
+      ] ++ lib.optionals (config.kubeconfig != null) [
+        "--kubeconifg"
+        config.kubeconfig
+      ] ++ lib.optionals (config.context != null) [
+        "--kube-context"
+        config.context
+      ] ++ lib.optionals (config.kustomization != { }) [
+        "--post-renderer"
+        postRenderer
+      ];
 
       drv = {
         inherit (output) drvPath type;

@@ -8,15 +8,6 @@ let
     plugins = with pkgs.kubernetes-helmPlugins; [ helm-diff ];
   });
 
-  postRenderer = pkgs.writeShellScript "kustomize.sh" ''
-    set -euo pipefail
-    TMP=$(mktemp -d)
-    cat > $TMP/resources.yaml
-    cp kustomization.yaml $TMP/kustomization.yaml
-    kubectl kustomize $TMP
-    rm -r $TMP
-  '';
-
   ifNotNullString = str: lib.optionalString (str != null);
 
   partitionAttrs = fn: values:
@@ -38,9 +29,7 @@ in
 , name
 , templates ? { }
 , values ? null
-, namespace
-, kubeconfig
-, context
+, helmArgs
 , kustomization ? { }
 }:
 let
@@ -61,21 +50,12 @@ let
 
   kustomization' = kustomization // { resources = [ "resources.yaml" ]; };
 
-  # Helm Boilerplate
-  helmArgs = ''\
-    --namespace "${namespace}" \
-  '' + lib.optionalString (kustomization != { }) ''
-    --post-renderer ${postRenderer} \
-  '' + ifNotNullString kubeconfig ''
-    --kubeconfig "${kubeconfig}" \
-  '' + ifNotNullString context ''
-    --kube-context "${context}" \
-  '';
-
-  helmArgsWithValues = helmArgs + ''
-    --values "${placeholder "out"}/values.yaml" \
+  helmArgsWithValues = helmArgs ++ [
+    "--values"
+    "${placeholder "out"}/values.yaml"
     "${placeholder "out"}"
-  '';
+  ];
+
 
   bashConfirmationDialog = name: successCmd: cancelMsg: ''
     echo -e "\n\n\e[1mDo you wish to apply these changes to '\e[34m${name}\e[0m\e[1m'?\e[0m"
@@ -95,23 +75,23 @@ let
     #! ${pkgs.bash}/bin/sh
     cd ${placeholder "out"}
     ${placeholder "out"}/bin/plan.sh
-    ${bashConfirmationDialog name "upgrade --install ${name} ${helmArgsWithValues}" "Apply canceled"}
+    ${bashConfirmationDialog name "upgrade --install ${name} ${toString helmArgsWithValues}" "Apply canceled"}
   '';
 
   __commandDestroy = ''
     #! ${pkgs.bash}/bin/sh
-    ${bashConfirmationDialog name "uninstall ${name} ${helmArgs}" "Destroy canceled"}
+    ${bashConfirmationDialog name "uninstall ${name} ${toString helmArgs}" "Destroy canceled"}
   '';
 
   __commandPlan = ''
     #! ${pkgs.bash}/bin/sh
     cd ${placeholder "out"}
-    ${helm} diff upgrade ${name} --install  ${helmArgsWithValues}
+    ${helm} diff upgrade ${name} --install  ${toString helmArgsWithValues}
   '';
 
   __commandStatus = ''
     #! ${pkgs.bash}/bin/sh
-    ${helm} status ${name} ${helmArgs}
+    ${helm} status ${name} ${toString helmArgs}
   '';
 
 in
