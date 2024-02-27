@@ -58,8 +58,8 @@ let
 
   # Helm Boilerplate
   helmArgs = ''\
-        --namespace "${namespace}" \
-      '' + lib.optionalString (kustomization != { }) ''
+    --namespace "${namespace}" \
+  '' + lib.optionalString (kustomization != { }) ''
     --post-renderer ${postRenderer} \
   '' + ifNotNullString kubeconfig ''
     --kubeconfig "${kubeconfig}" \
