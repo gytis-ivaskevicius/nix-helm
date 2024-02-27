@@ -136,7 +136,7 @@ in
         "--namespace"
         config.namespace
       ] ++ lib.optionals (config.kubeconfig != null) [
-        "--kubeconifg"
+        "--kubeconfig"
         config.kubeconfig
       ] ++ lib.optionals (config.context != null) [
         "--kube-context"
