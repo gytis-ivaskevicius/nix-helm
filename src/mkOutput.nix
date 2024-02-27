@@ -46,7 +46,12 @@ in
 let
 
   fileNameToEnvVar = builtins.replaceStrings [ "." "-" ] [ "_" "_" ];
-  templates' = lib.mapAttrs' (n: v: { name = n; value = if builtins.isPath v then v else builtins.toJSON v; }) templates;
+  templates' = lib.mapAttrs'
+    (n: v: {
+      name = "${n}.yaml";
+      value = if builtins.isPath v then v else builtins.toJSON v;
+    })
+    templates;
 
   templatesPartitions = (partitionAttrs (_: builtins.isPath) (lib.mapAttrs' (n: v: { name = fileNameToEnvVar n; value = v; }) templates'));
   templatesNames = lib.mapAttrs' (n: _: { name = "${fileNameToEnvVar n}Name"; value = n; }) templates';
