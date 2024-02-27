@@ -11,6 +11,7 @@
       examples = helmish: {
         sample = import ./examples/nginx { inherit helmish; };
         ubuntu = import ./examples/ubuntu { inherit helmish; };
+        ubuntu-multitarget = import ./examples/ubuntu-multitarget { inherit helmish; };
       };
     in
     {
