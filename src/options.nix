@@ -38,7 +38,7 @@ in
       description = "Arguments passed to helm";
       example = [ "--debug" ];
       default = [ ];
-      type = types.listOf types.str;
+      type = types.listOf (types.either types.str types.path);
     };
 
     templates = mkOption {
