@@ -19,7 +19,7 @@ in
     kubeconfig = mkOption {
       description = "Path to $KUBECONFIG. May contain variables like devshell provided $PRJ_ROOT";
       example = "$PRJ_ROOT/.kube/us-east-1";
-      type = types.str;
+      type = types.either types.str types.path;
     };
 
     context = mkOption {
