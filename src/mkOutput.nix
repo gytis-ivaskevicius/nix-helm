@@ -50,7 +50,7 @@ let
 
   kustomization' = kustomization // { resources = [ "resources.yaml" ]; };
 
-  helmArgsWithValues = helmArgs ++ [
+  valuesArgs = [
     "--values"
     "${placeholder "out"}/values.yaml"
     "${placeholder "out"}"
@@ -75,23 +75,23 @@ let
     #! ${pkgs.bash}/bin/sh
     cd ${placeholder "out"}
     ${placeholder "out"}/bin/plan.sh
-    ${bashConfirmationDialog name "upgrade --install ${name} ${toString helmArgsWithValues}" "Apply canceled"}
+    ${bashConfirmationDialog name "upgrade --install ${name} ${toString (helmArgs.apply ++ valuesArgs)}" "Apply canceled"}
   '';
 
   __commandDestroy = ''
     #! ${pkgs.bash}/bin/sh
-    ${bashConfirmationDialog name "uninstall ${name} ${toString helmArgs}" "Destroy canceled"}
+    ${bashConfirmationDialog name "uninstall ${name} ${toString helmArgs.destroy}" "Destroy canceled"}
   '';
 
   __commandPlan = ''
     #! ${pkgs.bash}/bin/sh
     cd ${placeholder "out"}
-    ${helm} diff upgrade ${name} --install  ${toString helmArgsWithValues}
+    ${helm} diff upgrade ${name} --install  ${toString (helmArgs.plan ++ valuesArgs)}
   '';
 
   __commandStatus = ''
     #! ${pkgs.bash}/bin/sh
-    ${helm} status ${name} ${toString helmArgs}
+    ${helm} status ${name} ${toString helmArgs.status}
   '';
 
 in

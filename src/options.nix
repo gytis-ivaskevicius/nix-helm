@@ -34,8 +34,29 @@ in
       type = types.path;
     };
 
-    helmArgs = mkOption {
-      description = "Arguments passed to helm";
+    helmArgs.plan = mkOption {
+      description = "Helm arguments passed to `plan` action";
+      example = [ "--debug" ];
+      default = [ ];
+      type = types.listOf (types.either types.str types.path);
+    };
+
+    helmArgs.apply = mkOption {
+      description = "Helm arguments passed to `apply` action";
+      example = [ "--debug" ];
+      default = [ ];
+      type = types.listOf (types.either types.str types.path);
+    };
+
+    helmArgs.destroy = mkOption {
+      description = "Helm arguments passed to `destroy` action";
+      example = [ "--debug" ];
+      default = [ ];
+      type = types.listOf (types.either types.str types.path);
+    };
+
+    helmArgs.status = mkOption {
+      description = "Helm arguments passed to `status` action";
       example = [ "--debug" ];
       default = [ ];
       type = types.listOf (types.either types.str types.path);
@@ -125,14 +146,8 @@ in
         kubectl kustomize $TMP
         rm -r $TMP
       '';
-    in
-    {
-      _module.args = {
-        inherit (config) utils values;
-        chart = config;
-      };
 
-      helmArgs = lib.optionals (config.namespace != null) [
+      commonHelmArgs = lib.optionals (config.namespace != null) [
         "--namespace"
         config.namespace
       ] ++ lib.optionals (config.kubeconfig != null) [
@@ -141,10 +156,23 @@ in
       ] ++ lib.optionals (config.context != null) [
         "--kube-context"
         config.context
-      ] ++ lib.optionals (config.kustomization != { }) [
+      ];
+
+      helmArgsWithRenderer = commonHelmArgs ++ lib.optionals (config.kustomization != { }) [
         "--post-renderer"
         postRenderer
       ];
+    in
+    {
+      _module.args = {
+        inherit (config) utils values;
+        chart = config;
+      };
+
+      helmArgs.plan = helmArgsWithRenderer;
+      helmArgs.apply = helmArgsWithRenderer;
+      helmArgs.destroy = commonHelmArgs;
+      helmArgs.status = commonHelmArgs;
 
       drv = {
         inherit (output) drvPath type;
