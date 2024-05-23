@@ -16,7 +16,7 @@ let
     in
     eval.config.drv;
 
-  mkHelmMultiTarget = { defaults ? _: { }, targets, extraTargetGroups ? _: { } }:
+  mkHelmMultiTarget = { defaults ? _: { }, targets, targetGroups ? _: { } }:
     let
       chartConstructor = name: target:
         let
@@ -35,7 +35,7 @@ let
                 ${value.${scriptKey}}/bin/${value.${scriptKey}.meta.mainProgram}
               '')
               (lib.mapAttrs chartConstructor targets)));
-      extraTargetGroups' = (extraTargetGroups targets) // {
+      targetGroups' = (targetGroups targets) // {
         ALL = targets;
       };
     in
@@ -46,7 +46,7 @@ let
         plan = mkAllScript targets "plan";
         status = mkAllScript targets "status";
       })
-      extraTargetGroups');
+      targetGroups');
 in
 {
   inherit mkHelmMultiTarget mkHelm mkOutput;
