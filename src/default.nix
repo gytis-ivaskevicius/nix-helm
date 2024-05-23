@@ -16,15 +16,16 @@ let
     in
     eval.config.drv;
 
-  mkHelmMultiTarget = { defaults ? _: { }, targets }:
+  mkHelmMultiTarget = { defaults ? _: { }, targets, extraTargetGroups ? _: { } }:
     let
       chartConstructor = name: target:
         let
           args = (lib.recursiveUpdate (defaults args) (target args));
         in
         mkHelm args;
+
       deployments = lib.mapAttrs chartConstructor targets;
-      mkAllScript = scriptKey:
+      mkAllScript = targets: scriptKey:
         pkgs.writers.writeBashBin "all-${scriptKey}.sh"
           (lib.concatStringsSep "\n"
             (lib.mapAttrsToList
@@ -33,16 +34,19 @@ let
                 echo -e "\e[1mExecuting ${scriptKey} on '\e[34m${name}\e[0m\e[1m':\e[0m\n"
                 ${value.${scriptKey}}/bin/${value.${scriptKey}.meta.mainProgram}
               '')
-              deployments));
-    in
-    deployments // {
-      ALL = {
-        apply = mkAllScript "apply";
-        destroy = mkAllScript "destroy";
-        plan = mkAllScript "plan";
-        status = mkAllScript "status";
+              (lib.mapAttrs chartConstructor targets)));
+      extraTargetGroups' = (extraTargetGroups targets) // {
+        ALL = targets;
       };
-    };
+    in
+    deployments // (lib.mapAttrs
+      (name: targets: {
+        apply = mkAllScript targets "apply";
+        destroy = mkAllScript targets "destroy";
+        plan = mkAllScript targets "plan";
+        status = mkAllScript targets "status";
+      })
+      extraTargetGroups');
 in
 {
   inherit mkHelmMultiTarget mkHelm mkOutput;
