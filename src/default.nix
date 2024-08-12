@@ -14,7 +14,7 @@ let
         specialArgs = { inherit pkgs; };
       };
     in
-    eval.config.drv;
+    eval.config.drv // {options = eval.options;};
 
   mkHelmMultiTarget = { defaults ? _: { }, targets, targetGroups ? _: { } }:
     let

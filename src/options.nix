@@ -62,6 +62,12 @@ in
       type = types.listOf (types.either types.str types.path);
     };
 
+    copyToRoot = mkOption {
+      description = "Files or directories to copy to root of the derivation. Used to pass additional configs";
+      type = types.attrsOf types.path;
+      default = {};
+    };
+
     templates = mkOption {
       description = "Attrset of Kubernetes resources";
       example = literalExpression ''
@@ -132,7 +138,7 @@ in
   config =
     let
       mkOutput = import ./mkOutput.nix { inherit pkgs lib; };
-      output = mkOutput { inherit (config) name values chart templates helmArgs kustomization; };
+      output = mkOutput { inherit (config) name values chart templates helmArgs kustomization copyToRoot; };
       mkAction = execName: {
         inherit (output) drvPath type outPath outputName name;
         meta.mainProgram = execName;

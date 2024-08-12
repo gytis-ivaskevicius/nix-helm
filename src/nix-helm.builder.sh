@@ -23,3 +23,7 @@ done
 for file in $fileTemplates; do
     cp $(eval "echo \$${file}") $(eval "echo \$out/templates/\$${file}Name")
 done
+
+for file in $copyToRoot; do
+    cp -R $(eval "echo \$${file}") $(eval "echo \$out/\$${file}Name")
+done

@@ -28,6 +28,7 @@ in
 { chart
 , name
 , templates ? { }
+, copyToRoot ? { }
 , values ? null
 , helmArgs
 , kustomization ? { }
@@ -44,6 +45,8 @@ let
 
   templatesPartitions = (partitionAttrs (_: builtins.isPath) (lib.mapAttrs' (n: v: { name = fileNameToEnvVar n; value = v; }) templates'));
   templatesNames = lib.mapAttrs' (n: _: { name = "${fileNameToEnvVar n}Name"; value = n; }) templates';
+  copyToRootNames = lib.mapAttrs' (n: _: { name = "${fileNameToEnvVar n}Name"; value = n; }) copyToRoot;
+  copyToRootVars = lib.mapAttrs' (n: v: { name = fileNameToEnvVar n; value = v; }) copyToRoot;
 
   fileTemplates = templatesPartitions.right;
   attrTemplates = templatesPartitions.wrong;
@@ -114,4 +117,5 @@ derivation ({
   passAsFile = [ "__commandApply" "__commandDestroy" "__commandPlan" "__commandStatus" "values" ] ++ builtins.attrNames attrTemplates;
   attrTemplates = builtins.attrNames attrTemplates;
   fileTemplates = builtins.attrNames fileTemplates;
-} // fileTemplates // attrTemplates // templatesNames // (lib.optionalAttrs (kustomization != { }) { kustomization = builtins.toJSON kustomization'; }))
+  copyToRoot = builtins.attrNames copyToRootVars;
+} // fileTemplates // attrTemplates // templatesNames // copyToRoot // copyToRootNames // (lib.optionalAttrs (kustomization != { }) { kustomization = builtins.toJSON kustomization'; }))

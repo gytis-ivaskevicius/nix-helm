@@ -11,6 +11,8 @@ helmish.mkHelmMultiTarget {
       namespace = "default";
       nameprefix = "prefix-";
     };
+    copyToRoot.hello = ./abc/test;
+    copyToRoot.world = ./abc;
 
     templates."test2.yaml" = ./default.nix;
     templates."test.yaml" = {
