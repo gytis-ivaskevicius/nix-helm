@@ -118,4 +118,4 @@ derivation ({
   attrTemplates = builtins.attrNames attrTemplates;
   fileTemplates = builtins.attrNames fileTemplates;
   copyToRoot = builtins.attrNames copyToRootVars;
-} // fileTemplates // attrTemplates // templatesNames // copyToRoot // copyToRootNames // (lib.optionalAttrs (kustomization != { }) { kustomization = builtins.toJSON kustomization'; }))
+} // fileTemplates // attrTemplates // templatesNames // copyToRootVars // copyToRootNames // (lib.optionalAttrs (kustomization != { }) { kustomization = builtins.toJSON kustomization'; }))
