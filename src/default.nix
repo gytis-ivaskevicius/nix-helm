@@ -18,7 +18,7 @@ let
     let
       chartConstructor = name: target:
         let
-          args = (lib.recursiveUpdate (defaults args) (target args));
+          args = (lib.recursiveUpdate (defaults args) ({ targetName = lib.mkDefault name; } // (target args)));
         in
         mkHelm args;
 

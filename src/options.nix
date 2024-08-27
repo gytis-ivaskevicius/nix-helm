@@ -2,7 +2,7 @@
 let
   inherit (lib) types literalExpression mkOption;
 
-  kubectl = lib.getExe pkgs.kubectl;
+  kubectl = "${pkgs.kubectl}/bin/kubectl";
   helm = lib.getExe (pkgs.wrapHelm pkgs.kubernetes-helm {
     plugins = with pkgs.kubernetes-helmPlugins; [ helm-diff ];
   });
@@ -22,6 +22,12 @@ let
 in
 {
   options = {
+    targetName = mkOption {
+      description = "Deployment target name";
+      type = types.str;
+      readOnly = true;
+    };
+
     name = mkOption {
       description = "Name of Helm deployment";
       example = "my-helm-deployment-name";
@@ -185,7 +191,7 @@ in
 
 
           bashConfirmationDialog = successCmd: cancelMsg: ''
-            echo -e "\n\n\e[1mDo you wish to apply these changes to '\e[34m${config.name}\e[0m\e[1m'?\e[0m"
+            echo -e "\n\n\e[1mDo you wish to apply these changes to '\e[34m${config.targetName}\e[0m\e[1m'?\e[0m"
             echo -e "  Only 'yes' will be accepted to approve.\n"
             read -p $'\e[1m  Enter a value: \e[0m' choice
             case "$choice" in
