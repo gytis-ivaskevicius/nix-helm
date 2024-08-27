@@ -283,7 +283,6 @@ in
     {
       _module.args = {
         inherit (config) utils values;
-        chart = config;
       };
 
       helmArgs.plan = helmArgsWithRenderer;
