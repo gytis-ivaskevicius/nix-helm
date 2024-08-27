@@ -2,8 +2,6 @@
 , lib
 }:
 let
-  mkOutput = import ./mkOutput.nix { inherit pkgs lib; };
-
   mkHelm = attrs:
     let
       eval = lib.evalModules {
@@ -14,7 +12,7 @@ let
         specialArgs = { inherit pkgs; };
       };
     in
-    eval.config.drv // {options = eval.options;};
+    eval.config.drv // { options = eval.options; };
 
   mkHelmMultiTarget = { defaults ? _: { }, targets, targetGroups ? _: { } }:
     let
@@ -49,5 +47,5 @@ let
       targetGroups');
 in
 {
-  inherit mkHelmMultiTarget mkHelm mkOutput;
+  inherit mkHelmMultiTarget mkHelm;
 }

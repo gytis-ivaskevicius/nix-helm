@@ -1,6 +1,24 @@
 { pkgs, lib, config, ... }:
 let
   inherit (lib) types literalExpression mkOption;
+
+  kubectl = lib.getExe pkgs.kubectl;
+  helm = lib.getExe (pkgs.wrapHelm pkgs.kubernetes-helm {
+    plugins = with pkgs.kubernetes-helmPlugins; [ helm-diff ];
+  });
+
+  partitionAttrs = fn: values:
+    lib.foldlAttrs
+      (acc: name: value:
+        if fn name value then {
+          inherit (acc) wrong;
+          right = acc.right // { ${name} = value; };
+        } else {
+          inherit (acc) right;
+          wrong = acc.wrong // { "${name}" = value; };
+        })
+      { right = { }; wrong = { }; }
+      values;
 in
 {
   options = {
@@ -34,38 +52,40 @@ in
       type = types.path;
     };
 
-    helmArgs.plan = mkOption {
-      description = "Helm arguments passed to `plan` action";
-      example = [ "--debug" ];
-      default = [ ];
-      type = types.listOf (types.either types.str types.path);
-    };
+    helmArgs = {
+      plan = mkOption {
+        description = "Helm arguments passed to `plan` action";
+        example = [ "--debug" ];
+        default = [ ];
+        type = types.listOf (types.either types.str types.path);
+      };
 
-    helmArgs.apply = mkOption {
-      description = "Helm arguments passed to `apply` action";
-      example = [ "--debug" ];
-      default = [ ];
-      type = types.listOf (types.either types.str types.path);
-    };
+      apply = mkOption {
+        description = "Helm arguments passed to `apply` action";
+        example = [ "--debug" ];
+        default = [ ];
+        type = types.listOf (types.either types.str types.path);
+      };
 
-    helmArgs.destroy = mkOption {
-      description = "Helm arguments passed to `destroy` action";
-      example = [ "--debug" ];
-      default = [ ];
-      type = types.listOf (types.either types.str types.path);
-    };
+      destroy = mkOption {
+        description = "Helm arguments passed to `destroy` action";
+        example = [ "--debug" ];
+        default = [ ];
+        type = types.listOf (types.either types.str types.path);
+      };
 
-    helmArgs.status = mkOption {
-      description = "Helm arguments passed to `status` action";
-      example = [ "--debug" ];
-      default = [ ];
-      type = types.listOf (types.either types.str types.path);
+      status = mkOption {
+        description = "Helm arguments passed to `status` action";
+        example = [ "--debug" ];
+        default = [ ];
+        type = types.listOf (types.either types.str types.path);
+      };
     };
 
     copyToRoot = mkOption {
       description = "Files or directories to copy to root of the derivation. Used to pass additional configs";
       type = types.attrsOf types.path;
-      default = {};
+      default = { };
     };
 
     templates = mkOption {
@@ -137,8 +157,93 @@ in
 
   config =
     let
-      mkOutput = import ./mkOutput.nix { inherit pkgs lib; };
-      output = mkOutput { inherit (config) name values chart templates helmArgs kustomization copyToRoot; };
+      output =
+        let
+          fileNameToEnvVar = builtins.replaceStrings [ "." "-" ] [ "_" "_" ];
+          templates' = lib.mapAttrs'
+            (n: v: {
+              name = "${n}.yaml";
+              value = if builtins.isPath v then v else builtins.toJSON v;
+            })
+            config.templates;
+
+          templatesPartitions = (partitionAttrs (_: builtins.isPath) (lib.mapAttrs' (n: v: { name = fileNameToEnvVar n; value = v; }) templates'));
+          templatesNames = lib.mapAttrs' (n: _: { name = "${fileNameToEnvVar n}Name"; value = n; }) templates';
+          copyToRootNames = lib.mapAttrs' (n: _: { name = "${fileNameToEnvVar n}Name"; value = n; }) config.copyToRoot;
+          copyToRootVars = lib.mapAttrs' (n: v: { name = fileNameToEnvVar n; value = v; }) config.copyToRoot;
+
+          fileTemplates = templatesPartitions.right;
+          attrTemplates = templatesPartitions.wrong;
+
+          kustomization' = config.kustomization // { resources = [ "resources.yaml" ]; };
+
+          valuesArgs = [
+            "--values"
+            "${placeholder "out"}/values.yaml"
+            "${placeholder "out"}"
+          ];
+
+
+          bashConfirmationDialog = successCmd: cancelMsg: ''
+            echo -e "\n\n\e[1mDo you wish to apply these changes to '\e[34m${config.name}\e[0m\e[1m'?\e[0m"
+            echo -e "  Only 'yes' will be accepted to approve.\n"
+            read -p $'\e[1m  Enter a value: \e[0m' choice
+            case "$choice" in
+              yes )
+                echo
+                ${helm} ${successCmd}
+              ;;
+              * ) echo -e '\n${cancelMsg}'; exit 1;;
+            esac
+          '';
+
+          # Helm Commands
+          __commandApply = ''
+            #! ${pkgs.bash}/bin/sh
+            cd ${placeholder "out"}
+            ${placeholder "out"}/bin/plan.sh
+            ${bashConfirmationDialog "upgrade --install ${config.name} ${toString (config.helmArgs.apply ++ valuesArgs)}" "Apply canceled"}
+          '';
+
+          __commandDestroy = ''
+            #! ${pkgs.bash}/bin/sh
+            ${bashConfirmationDialog "uninstall ${config.name} ${toString config.helmArgs.destroy}" "Destroy canceled"}
+          '';
+
+          __commandPlan = ''
+            #! ${pkgs.bash}/bin/sh
+            cd ${placeholder "out"}
+            ${helm} diff upgrade ${config.name} --install  ${toString (config.helmArgs.plan ++ valuesArgs)}
+          '';
+
+          __commandStatus = ''
+            #! ${pkgs.bash}/bin/sh
+            ${helm} status ${config.name} ${toString config.helmArgs.status}
+          '';
+
+        in
+        derivation ({
+          inherit __commandApply __commandDestroy __commandPlan __commandStatus;
+          inherit (pkgs) system;
+          name = lib.strings.sanitizeDerivationName config.name;
+          builder = "${pkgs.bash}/bin/sh";
+          args = [ ./nix-helm.builder.sh ];
+          __ignoreNulls = true;
+          preferLocalBuild = true;
+          allowSubstitutes = false;
+
+          PATH = lib.makeBinPath [ pkgs.coreutils pkgs.gojsontoyaml ];
+
+          chartPath = config.chart;
+          #chart = if chart == null then null else builtins.toJSON chart;
+          values = builtins.toJSON config.values;
+
+          passAsFile = [ "__commandApply" "__commandDestroy" "__commandPlan" "__commandStatus" "values" ] ++ builtins.attrNames attrTemplates;
+          attrTemplates = builtins.attrNames attrTemplates;
+          fileTemplates = builtins.attrNames fileTemplates;
+          copyToRoot = builtins.attrNames copyToRootVars;
+        } // fileTemplates // attrTemplates // templatesNames // copyToRootVars // copyToRootNames // (lib.optionalAttrs (config.kustomization != { }) { kustomization = builtins.toJSON kustomization'; }));
+
       mkAction = execName: {
         inherit (output) drvPath type outPath outputName name;
         meta.mainProgram = execName;
@@ -149,7 +254,7 @@ in
         TMP=$(mktemp -d)
         cat > $TMP/resources.yaml
         cp kustomization.yaml $TMP/kustomization.yaml
-        kubectl kustomize $TMP
+        ${kubectl} kustomize $TMP
         rm -r $TMP
       '';
 
