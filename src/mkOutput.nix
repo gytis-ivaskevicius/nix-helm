@@ -100,8 +100,8 @@ let
 in
 derivation ({
   inherit __commandApply __commandDestroy __commandPlan __commandStatus;
-  inherit name;
   inherit (pkgs) system;
+  name = lib.strings.sanitizeDerivationName name;
   builder = "${pkgs.bash}/bin/sh";
   args = [ ./nix-helm.builder.sh ];
   __ignoreNulls = true;
